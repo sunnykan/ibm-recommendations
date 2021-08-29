@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 from ordered_set import OrderedSet
 
 
@@ -181,7 +182,40 @@ TO DO
     return recs_ids, recs_names  # return your recommendations for this user_id
 
 
-def evaluate_accuracy(df_train, df_test):
+def gen_prediction_mat(u_train, s_train, vt_train, k):
+    u_k = u_train[:, :k]
+    vt_k = vt_train[:k, :]
+    s_k = np.zeros((k, k))
+    s_k[:k, :k] = np.diag(s_train[:k])
+    predictions_mat = np.dot(np.dot(u_k, s_k), vt_k)
+    return predictions_mat
+
+
+def matrix_subset(data_matrix, article_ids_idx, user_ids_idx):
+    matrix_temp = data_matrix[:, article_ids_idx]
+    matrix_actual = matrix_temp[user_ids_idx, :]
+
+    return matrix_actual
+
+
+def calculate_total_errors(data_matrix, predictions_matrix):
+    errors = np.subtract(data_matrix, predictions_matrix)
+    errors_total = np.sum(np.sum(np.abs(errors)))
+
+    return errors_total
+
+
+def create_test_train_user_item(df_train, df_test):
+    user_item_train, _, _ = get_user_item_mat(df_train)
+    user_item_test, _, _ = get_user_item_mat(df_test)
+
+    test_user_ids = df_test.user_id.unique()
+    test_article_ids = df_test.article_id.unique()
+
+    return user_item_train, user_item_test, test_user_ids, test_article_ids
+
+
+def evaluate_accuracy(df_train, df_test, num_latent_features):
     (
         user_item_train,
         user_item_test,
@@ -196,57 +230,62 @@ def evaluate_accuracy(df_train, df_test):
     num_articles = df_train.article_id.nunique()
 
     user_id_lookup = dict(zip(df_train.user_id.unique(), range(num_users)))
-    article_id_lookup = dict(zip(df_train.article_id.unique(), range(num_users)))
+    article_id_lookup = dict(zip(df_train.article_id.unique(), range(num_articles)))
 
-    num_latent_features = np.arange(10, 701, 20)
-    sum_errors_k = []
+    sum_errors_train_k = []
+    sum_errors_test_k = []
 
-    num_latent_features = np.arange(10, 700 + 10, 20)
+    u_train, s_train, vt_train = np.linalg.svd(user_item_train)
+
     for k in num_latent_features:
         print(k)
-        u_train, s_train, vt_train = np.linalg.svd(user_item_train)
+        predictions_mat = gen_prediction_mat(u_train, s_train, vt_train, k)
 
-        u_k = u_train[:, :k]
-        vt_k = vt_train[:k, :]
-        s_k = np.zeros((k, k))
-        s_k[:k, :k] = np.diag(s_train[:k])
-        predictions = np.dot(np.dot(u_k, s_k), vt_k)
-
-        predictions_user_ids = np.intersect1d(test_user_ids, train_user_ids)
-        predictions_article_ids = np.intersect1d(test_article_ids, train_article_ids)
-
-        predictions_user_ids_idx = [
-            user_id_lookup[user_id] for user_id in predictions_user_ids
-        ]
-        predictions_article_ids_idx = [
-            article_id_lookup[article_id] for article_id in predictions_article_ids
+        # get corresponding index values in user_item matrix
+        train_user_ids_idx = [user_id_lookup[user_id] for user_id in train_user_ids]
+        train_article_ids_idx = [
+            article_id_lookup[article_id] for article_id in train_article_ids
         ]
 
-        predictions_temp = predictions[:, predictions_article_ids_idx]
-        predictions_test = predictions_temp[predictions_user_ids_idx, :]
+        errors_train_total = calculate_total_errors(user_item_train, predictions_mat)
+        sum_errors_train_k.append(errors_train_total)
 
-        user_item_temp = user_item_train[:, predictions_article_ids_idx]
-        user_item_train_actual = user_item_temp[predictions_user_ids_idx, :]
+        common_test_user_ids = np.intersect1d(test_user_ids, train_user_ids)
+        common_test_article_ids = np.intersect1d(test_article_ids, train_article_ids)
 
-        errors = np.subtract(user_item_train_actual, predictions_test)
-        errors_total = np.sum(np.sum(np.abs(errors)))
-        sum_errors_k.append(errors_total)
-        mean_errors_k = np.array(sum_errors_k) / (
-            predictions_test.shape[0] * predictions_test.shape[1]
+        # get corresponding index values in user_item matrix
+        test_user_ids_idx = [
+            user_id_lookup[user_id] for user_id in common_test_user_ids
+        ]
+        test_article_ids_idx = [
+            article_id_lookup[article_id] for article_id in common_test_article_ids
+        ]
+
+        user_item_test_actual = matrix_subset(
+            user_item_train, test_article_ids_idx, test_user_ids_idx
         )
 
-    accuracy_k = 1 - mean_errors_k
-    return accuracy_k
+        predictions_test = matrix_subset(
+            predictions_mat, test_article_ids_idx, test_user_ids_idx
+        )
 
+        errors_test_total = calculate_total_errors(
+            user_item_test_actual, predictions_test
+        )
+        sum_errors_test_k.append(errors_test_total)
 
-def create_test_train_user_item(df_train, df_test):
-    user_item_train, _, _ = get_user_item_mat(df_train)
-    user_item_test, _, _ = get_user_item_mat(df_test)
+    mean_errors_train_k = np.array(sum_errors_train_k) / (
+        predictions_mat.shape[0] * predictions_mat.shape[1]
+    )
 
-    test_user_ids = df_test.user_id.unique()
-    test_article_ids = df_test.article_id.unique()
+    mean_errors_test_k = np.array(sum_errors_test_k) / (
+        predictions_test.shape[0] * predictions_test.shape[1]
+    )
 
-    return user_item_train, user_item_test, test_user_ids, test_article_ids
+    accuracy_train_k = 1 - mean_errors_train_k
+    accuracy_test_k = 1 - mean_errors_test_k
+
+    return accuracy_train_k, accuracy_test_k
 
 
 if __name__ == "__main__":
@@ -280,10 +319,22 @@ if __name__ == "__main__":
 
     df_train = df.head(40000)
     df_test = df.tail(5993)
-    accuracy_k = evaluate_accuracy(df_train, df_test)
 
-    plt.plot(num_latent_features, accuracy_k)
+    num_latent_features = np.arange(10, 720, 10)
+    accuracy_train_k, accuracy_test_k = evaluate_accuracy(
+        df_train, df_test, num_latent_features
+    )
+
+    with open("../data/train_accuracy_pkl", "wb") as fhand:
+        pickle.dump(accuracy_train_k, fhand)
+
+    with open("../data/test_accuracy_pkl", "wb") as fhand:
+        pickle.dump(accuracy_test_k, fhand)
+
+    plt.plot(num_latent_features, accuracy_train_k)
+    plt.plot(num_latent_features, accuracy_test_k)
     plt.xlabel("Number of Latent Features")
     plt.ylabel("Accuracy")
     plt.title("Accuracy vs. Number of Latent Features")
+    plt.show()
 

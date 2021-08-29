@@ -3,19 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ordered_set import OrderedSet
 
-df = pd.read_csv("../data/user-item-interactions.csv")
-df_content = pd.read_csv("../data/articles_community.csv")
-
-del df["Unnamed: 0"]
-del df_content["Unnamed: 0"]
-
-df["article_id"] = df.article_id.astype("str")
-
-print(df.email.value_counts().head())
-plt.hist(df.email.value_counts().values)
-
-df_content.drop_duplicates(subset=["article_id"], inplace=True)
-
 
 def email_mapper():
     df_copy = df.copy()
@@ -24,11 +11,6 @@ def email_mapper():
     df_copy["user_id"] = df_copy.email.apply(lambda x: email_user_id_dict[x])
     df_copy.drop(["email"], inplace=True, axis=1)
     return df_copy
-
-
-df = email_mapper()
-
-df = df[["user_id", "article_id", "title"]]
 
 
 def get_user_item_mat(df):
@@ -51,7 +33,7 @@ def get_user_item_mat(df):
     return user_item_mat, users_keys, items_keys
 
 
-def get_top_articles(n, df=df):
+def get_top_articles(n, df):
     """
 TO DO
     """
@@ -62,7 +44,7 @@ TO DO
     ].to_list()  # Return the top article titles from df (not df_content)
 
 
-def get_top_article_ids(n, df=df):
+def get_top_article_ids(n, df):
     """
 TO DO    
     """
@@ -71,7 +53,7 @@ TO DO
     return top_articles.index[:n].to_list()  # Return the top article ids
 
 
-def find_similar_users(user_id, user_item=user_item):
+def find_similar_users(user_id, user_item):
     """
 TO DO
     """
@@ -83,7 +65,7 @@ TO DO
     return most_similar_users  # return a list of the users in order from most to least similar
 
 
-def get_article_names(article_ids, df=df):
+def get_article_names(article_ids, df):
     """
 TO DO
     """
@@ -95,7 +77,7 @@ TO DO
     return article_names  # Return the article names associated with list of article ids
 
 
-def get_user_articles(user_id, user_item=user_item):
+def get_user_articles(user_id, user_item):
     """
 TO DO
     """
@@ -135,7 +117,7 @@ TO DO
     return recs  # return your recommendations for this user_id
 
 
-def get_top_sorted_users(user_id, df=df, user_item=user_item):
+def get_top_sorted_users(user_id, df, user_item):
     """
 TO DO
     """
@@ -199,9 +181,109 @@ TO DO
     return recs_ids, recs_names  # return your recommendations for this user_id
 
 
-user_item, _, _ = get_user_item_mat(df)
+def evaluate_accuracy(df_train, df_test):
+    (
+        user_item_train,
+        user_item_test,
+        test_user_ids,
+        test_article_ids,
+    ) = create_test_train_user_item(df_train, df_test)
 
-a = article_ids_idx
-b = np.argsort(article_interactions)[::-1]
-sorter = np.argsort(b)
-sorter[np.searchsorted(b, a, sorter=sorter)]
+    train_user_ids = df_train.user_id.unique()
+    train_article_ids = df_train.article_id.unique()
+
+    num_users = df_train.user_id.nunique()
+    num_articles = df_train.article_id.nunique()
+
+    user_id_lookup = dict(zip(df_train.user_id.unique(), range(num_users)))
+    article_id_lookup = dict(zip(df_train.article_id.unique(), range(num_users)))
+
+    num_latent_features = np.arange(10, 701, 20)
+    sum_errors_k = []
+
+    num_latent_features = np.arange(10, 700 + 10, 20)
+    for k in num_latent_features:
+        print(k)
+        u_train, s_train, vt_train = np.linalg.svd(user_item_train)
+
+        u_k = u_train[:, :k]
+        vt_k = vt_train[:k, :]
+        s_k = np.zeros((k, k))
+        s_k[:k, :k] = np.diag(s_train[:k])
+        predictions = np.dot(np.dot(u_k, s_k), vt_k)
+
+        predictions_user_ids = np.intersect1d(test_user_ids, train_user_ids)
+        predictions_article_ids = np.intersect1d(test_article_ids, train_article_ids)
+
+        predictions_user_ids_idx = [
+            user_id_lookup[user_id] for user_id in predictions_user_ids
+        ]
+        predictions_article_ids_idx = [
+            article_id_lookup[article_id] for article_id in predictions_article_ids
+        ]
+
+        predictions_temp = predictions[:, predictions_article_ids_idx]
+        predictions_test = predictions_temp[predictions_user_ids_idx, :]
+
+        user_item_temp = user_item_train[:, predictions_article_ids_idx]
+        user_item_train_actual = user_item_temp[predictions_user_ids_idx, :]
+
+        errors = np.subtract(user_item_train_actual, predictions_test)
+        errors_total = np.sum(np.sum(np.abs(errors)))
+        sum_errors_k.append(errors_total)
+        mean_errors_k = np.array(sum_errors_k) / (
+            predictions_test.shape[0] * predictions_test.shape[1]
+        )
+
+    accuracy_k = 1 - mean_errors_k
+    return accuracy_k
+
+
+def create_test_train_user_item(df_train, df_test):
+    user_item_train, _, _ = get_user_item_mat(df_train)
+    user_item_test, _, _ = get_user_item_mat(df_test)
+
+    test_user_ids = df_test.user_id.unique()
+    test_article_ids = df_test.article_id.unique()
+
+    return user_item_train, user_item_test, test_user_ids, test_article_ids
+
+
+if __name__ == "__main__":
+    df = pd.read_csv("../data/user-item-interactions.csv")
+    df_content = pd.read_csv("../data/articles_community.csv")
+
+    del df["Unnamed: 0"]
+    del df_content["Unnamed: 0"]
+
+    df["article_id"] = df.article_id.astype("str")
+
+    df = email_mapper()
+    df = df[["user_id", "article_id", "title"]]
+
+    # print(df.email.value_counts().head())
+    # plt.hist(df.email.value_counts().values)
+
+    df_content.drop_duplicates(subset=["article_id"], inplace=True)
+
+    user_item, _, _ = get_user_item_mat(df)
+    rec_ids, rec_names = user_user_recs_part2(20, 10)
+    user1_most_sim = find_similar_users(user_id=1, user_item=user_item)[0]
+    user131_10th_sim = find_similar_users(user_id=131, user_item=user_item)[9]
+
+    new_user = "0.0"
+    new_user_recs = get_top_article_ids(10, df=df)
+
+    # SVD
+    u, s, vt = np.linalg.svd(user_item)
+    print(u.shape, s.shape, vt.shape)
+
+    df_train = df.head(40000)
+    df_test = df.tail(5993)
+    accuracy_k = evaluate_accuracy(df_train, df_test)
+
+    plt.plot(num_latent_features, accuracy_k)
+    plt.xlabel("Number of Latent Features")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy vs. Number of Latent Features")
+

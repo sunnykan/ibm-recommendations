@@ -6,6 +6,11 @@ from ordered_set import OrderedSet
 
 
 def email_mapper():
+    """[summary]
+
+    :return: [description]
+    :rtype: [type]
+    """
     df_copy = df.copy()
     email_info = df_copy.email.unique()
     email_user_id_dict = dict(zip(email_info, range(1, len(email_info) + 1)))
@@ -15,7 +20,13 @@ def email_mapper():
 
 
 def get_user_item_mat(df):
-    """TO DO"""
+    """[summary]
+
+    :param df: [description]
+    :type df: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     num_users = df.iloc[:, 0].nunique()
     num_items = df.iloc[:, 1].nunique()
     # user_item_mat = np.empty((num_users, num_items))
@@ -35,8 +46,14 @@ def get_user_item_mat(df):
 
 
 def get_top_articles(n, df):
-    """
-TO DO
+    """[summary]
+
+    :param n: [description]
+    :type n: [type]
+    :param df: [description]
+    :type df: [type]
+    :return: [description]
+    :rtype: [type]
     """
     top_articles = df.title.value_counts().sort_values(ascending=False)
 
@@ -46,8 +63,14 @@ TO DO
 
 
 def get_top_article_ids(n, df):
-    """
-TO DO    
+    """[summary]
+
+    :param n: [description]
+    :type n: [type]
+    :param df: [description]
+    :type df: [type]
+    :return: [description]
+    :rtype: [type]
     """
     top_articles = df.article_id.value_counts().sort_values(ascending=False)
 
@@ -55,8 +78,14 @@ TO DO
 
 
 def find_similar_users(user_id, user_item):
-    """
-TO DO
+    """[summary]
+
+    :param user_id: [description]
+    :type user_id: [type]
+    :param user_item: [description]
+    :type user_item: [type]
+    :return: [description]
+    :rtype: [type]
     """
     # compute similarity of each user to the provided user
     similarity_scores_user_id = np.dot(user_item[user_id - 1], np.transpose(user_item))
@@ -67,8 +96,14 @@ TO DO
 
 
 def get_article_names(article_ids, df):
-    """
-TO DO
+    """[summary]
+
+    :param article_ids: [description]
+    :type article_ids: [type]
+    :param df: [description]
+    :type df: [type]
+    :return: [description]
+    :rtype: [type]
     """
 
     df_copy = df.copy()
@@ -79,8 +114,14 @@ TO DO
 
 
 def get_user_articles(user_id, user_item):
-    """
-TO DO
+    """[summary]
+
+    :param user_id: [description]
+    :type user_id: [type]
+    :param user_item: [description]
+    :type user_item: [type]
+    :return: [description]
+    :rtype: [type]
     """
     # Your code here
     df1 = df.copy()
@@ -99,8 +140,14 @@ TO DO
 
 
 def user_user_recs(user_id, m=10):
-    """
-TO DO
+    """[summary]
+
+    :param user_id: [description]
+    :type user_id: [type]
+    :param m: [description], defaults to 10
+    :type m: int, optional
+    :return: [description]
+    :rtype: [type]
     """
     recs_set = OrderedSet()
 
@@ -119,8 +166,16 @@ TO DO
 
 
 def get_top_sorted_users(user_id, df, user_item):
-    """
-TO DO
+    """[summary]
+
+    :param user_id: [description]
+    :type user_id: [type]
+    :param df: [description]
+    :type df: [type]
+    :param user_item: [description]
+    :type user_item: [type]
+    :return: [description]
+    :rtype: [type]
     """
     # compute similarity of each user to the provided user
     similarity_scores_user_id = np.dot(user_item[user_id - 1], np.transpose(user_item))
@@ -134,14 +189,22 @@ TO DO
     cols = ["neighbor_id", "similarity", "num_interactions"]
     data = [ranked_users, ranked_similarities, user_interactions]
     neighbors_df = pd.DataFrame.from_dict(dict(zip(cols, data)))
-    neighbors_df.sort_values(by=["similarity", "num_interactions"], ascending=False)
+    neighbors_df.sort_values(
+        by=["similarity", "num_interactions"], ascending=[False, False], inplace=True
+    )
 
     return neighbors_df  # Return the dataframe specified in the doc_string
 
 
 def user_user_recs_part2(user_id, m=10):
-    """
-TO DO
+    """[summary]
+
+    :param user_id: [description]
+    :type user_id: [type]
+    :param m: [description], defaults to 10
+    :type m: int, optional
+    :return: [description]
+    :rtype: [type]
     """
     recs_set = OrderedSet()
 
@@ -183,6 +246,19 @@ TO DO
 
 
 def gen_prediction_mat(u_train, s_train, vt_train, k):
+    """[summary]
+
+    :param u_train: [description]
+    :type u_train: [type]
+    :param s_train: [description]
+    :type s_train: [type]
+    :param vt_train: [description]
+    :type vt_train: [type]
+    :param k: [description]
+    :type k: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     u_k = u_train[:, :k]
     vt_k = vt_train[:k, :]
     s_k = np.zeros((k, k))
@@ -192,6 +268,17 @@ def gen_prediction_mat(u_train, s_train, vt_train, k):
 
 
 def matrix_subset(data_matrix, article_ids_idx, user_ids_idx):
+    """[summary]
+
+    :param data_matrix: [description]
+    :type data_matrix: [type]
+    :param article_ids_idx: [description]
+    :type article_ids_idx: [type]
+    :param user_ids_idx: [description]
+    :type user_ids_idx: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     matrix_temp = data_matrix[:, article_ids_idx]
     matrix_actual = matrix_temp[user_ids_idx, :]
 
@@ -199,6 +286,15 @@ def matrix_subset(data_matrix, article_ids_idx, user_ids_idx):
 
 
 def calculate_total_errors(data_matrix, predictions_matrix):
+    """[summary]
+
+    :param data_matrix: [description]
+    :type data_matrix: [type]
+    :param predictions_matrix: [description]
+    :type predictions_matrix: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     errors = np.subtract(data_matrix, predictions_matrix)
     errors_total = np.sum(np.sum(np.abs(errors)))
 
@@ -206,6 +302,15 @@ def calculate_total_errors(data_matrix, predictions_matrix):
 
 
 def create_test_train_user_item(df_train, df_test):
+    """[summary]
+
+    :param df_train: [description]
+    :type df_train: [type]
+    :param df_test: [description]
+    :type df_test: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     user_item_train, _, _ = get_user_item_mat(df_train)
     user_item_test, _, _ = get_user_item_mat(df_test)
 
@@ -216,6 +321,17 @@ def create_test_train_user_item(df_train, df_test):
 
 
 def evaluate_accuracy(df_train, df_test, num_latent_features):
+    """[summary]
+
+    :param df_train: [description]
+    :type df_train: [type]
+    :param df_test: [description]
+    :type df_test: [type]
+    :param num_latent_features: [description]
+    :type num_latent_features: [type]
+    :return: [description]
+    :rtype: [type]
+    """
     (
         user_item_train,
         user_item_test,
@@ -337,4 +453,3 @@ if __name__ == "__main__":
     plt.ylabel("Accuracy")
     plt.title("Accuracy vs. Number of Latent Features")
     plt.show()
-
